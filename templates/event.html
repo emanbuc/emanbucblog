@@ -1,0 +1,15 @@
+<div class="post">
+  <div class="post-heading">
+    <div class="post-title">
+      {{ce.title}}
+    </div>
+
+    <div class="post-date">
+      {{ce.created.strftime("%b %d, %Y")}}
+    </div>
+  </div>
+
+  <div class="post-content">
+    {{ce._render_text | safe}}
+  </div>
+</div>

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+  {% for ce in calendarEvents %}
+    {{ ce.render() | safe }}
+    <br><br>
+  {% endfor %}
+
+{% endblock %}
