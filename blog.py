@@ -7,6 +7,7 @@ from string import letters
 
 import webapp2
 import jinja2
+import json
 
 from google.appengine.ext import db
 from datetime import datetime
@@ -179,6 +180,18 @@ class CalendarFront(BlogHandler):
     def get(self):
         calendarEvents  = CalendarEvent.all().order('-created')
         self.render('calendarfront.html', calendarEvents = calendarEvents)
+
+class CalendarEventList(BlogHandler):
+    def get(self):
+        calendarEvents  = CalendarEvent.all().order('-created')
+        ##results = calendarEvents.fetch(limit=50)
+        result = []
+    	for entry in calendarEvents:
+        	result.append(dict([(p, unicode(getattr(entry, p))) for p in entry.properties()]))
+        print result
+        print json.dumps(result)
+        self.response.out.write(json.dumps(result))
+        
 
 class CalendarEventPage(BlogHandler):
     def get(self, ce_id):
@@ -353,6 +366,7 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/blog/newpost', NewPost),
                                ('/calendar/newevent', NewEvent),
                                ('/calendar/?', CalendarFront),
+                               ('/calendar/eventlist', CalendarEventList),
                                ('/calendar/([0-9]+)', CalendarEventPage),
                                ('/signup', Register),
                                ('/login', Login),
