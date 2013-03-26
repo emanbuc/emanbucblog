@@ -9,6 +9,7 @@ import webapp2
 import jinja2
 
 from google.appengine.ext import db
+from datetime import datetime
 
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader = jinja2.FileSystemLoader(template_dir),
@@ -171,16 +172,32 @@ class NewPost(BlogHandler):
 
 ##### EVENTS
 
+def calendarevent_key(name = 'default'):
+    return db.Key.from_path('calendarevent', name)
+    
 class CalendarFront(BlogHandler):
     def get(self):
         calendarEvents  = CalendarEvent.all().order('-created')
         self.render('calendarfront.html', calendarEvents = calendarEvents)
 
+class CalendarEventPage(BlogHandler):
+    def get(self, ce_id):
+        key = db.Key.from_path('CalendarEvent', int(ce_id), parent=calendarevent_key())
+        ce = db.get(key)
+
+        if not ce:
+            self.error(404)
+            return
+
+        self.render("calendareventpage.html", ce = ce)
+        
 class CalendarEvent(db.Model):
     title = db.StringProperty(required = True)
     description = db.TextProperty(required = True)
     created = db.DateTimeProperty(auto_now_add = True)
     last_modified = db.DateTimeProperty(auto_now = True)
+    startDate = db.DateTimeProperty(required = False)
+    endDate = db.DateTimeProperty(required = False)
 
     def render(self):
         self._render_text = self.description.replace('\n', '<br>')
@@ -199,11 +216,11 @@ class NewEvent(BlogHandler):
 
         title = self.request.get('title')
         description = self.request.get('description')
-        startDate = self.request.get('startdate')
-        endDate = self.request.get('enddate')
+        startDate = self.request.get('startDate')
+        endDate = self.request.get('endDate')
 
         if title and description:
-            ce = CalendarEvent(parent = blog_key(), description = description, title = title)
+            ce = CalendarEvent(parent = calendarevent_key(), description = description, title = title, startDate=datetime.strptime(startDate, "%Y-%m-%d"), endDate=datetime.strptime(endDate,"%Y-%m-%d"))
             ce.put()
             self.redirect('/calendar/%s' % str(ce.key().id()))
         else:
@@ -336,6 +353,7 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/blog/newpost', NewPost),
                                ('/calendar/newevent', NewEvent),
                                ('/calendar/?', CalendarFront),
+                               ('/calendar/([0-9]+)', CalendarEventPage),
                                ('/signup', Register),
                                ('/login', Login),
                                ('/logout', Logout),
