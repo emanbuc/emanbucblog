@@ -52,6 +52,7 @@ class BlogHandler(webapp2.RequestHandler):
         return cookie_val and check_secure_val(cookie_val)
 
     def login(self, user):
+        print 'user login '
         self.set_secure_cookie('user_id', str(user.key().id()))
 
     def logout(self):
@@ -112,10 +113,77 @@ class User(db.Model):
 
     @classmethod
     def login(cls, name, pw):
+        print 'username '+name
+        print 'password '+pw
         u = cls.by_name(name)
+        print 'username utente da validare:'+u.name
         if u and valid_pw(name, pw, u.pw_hash):
             return u
 
+### LOGIN
+class Signup(BlogHandler):
+    def get(self):
+        self.render("signup-form.html")
+
+    def post(self):
+        have_error = False
+        self.username = self.request.get('username')
+        self.password = self.request.get('password')
+        self.verify = self.request.get('verify')
+        self.email = self.request.get('email')
+
+        params = dict(username = self.username,
+                      email = self.email)
+
+        if not valid_username(self.username):
+            params['error_username'] = "That's not a valid username."
+            print 'invalid username'
+            have_error = True
+
+        if not valid_password(self.password):
+            params['error_password'] = "That wasn't a valid password."
+            print 'invalid password'
+            have_error = True
+        elif self.password != self.verify:
+            params['error_verify'] = "Your passwords didn't match."
+            print 'invalid password verify'
+            have_error = True
+
+        if not valid_email(self.email):
+            params['error_email'] = "That's not a valid email."
+            print 'invalid email'
+            have_error = True
+
+        if have_error:
+            self.render('welcome.html', **params)
+        else:
+            u = User.register(self.username, self.password, self.email)
+            print 'user da registrare:'+ u.name
+            u.put()
+            self.login(u)
+            self.render('welcome.html', **params)
+        
+
+class Login(BlogHandler):
+    def get(self):
+        self.render('login-form.html')
+
+    def post(self):
+        username = self.request.get('username')
+        password = self.request.get('password')
+
+        u = User.login(username, password)
+        if u:
+            self.login(u)
+            self.redirect('/blog')
+        else:
+            msg = 'Invalid login'
+            self.render('login-form.html', error = msg)
+
+class Logout(BlogHandler):
+    def get(self):
+        self.logout()
+        self.redirect('/blog')
 
 ##### blog stuff
 
@@ -266,88 +334,6 @@ EMAIL_RE  = re.compile(r'^[\S]+@[\S]+\.[\S]+$')
 def valid_email(email):
     return not email or EMAIL_RE.match(email)
 
-class Signup(BlogHandler):
-    def get(self):
-        self.render("signup-form.html")
-
-    def post(self):
-        have_error = False
-        self.username = self.request.get('username')
-        self.password = self.request.get('password')
-        self.verify = self.request.get('verify')
-        self.email = self.request.get('email')
-
-        params = dict(username = self.username,
-                      email = self.email)
-
-        if not valid_username(self.username):
-            params['error_username'] = "That's not a valid username."
-            have_error = True
-
-        if not valid_password(self.password):
-            params['error_password'] = "That wasn't a valid password."
-            have_error = True
-        elif self.password != self.verify:
-            params['error_verify'] = "Your passwords didn't match."
-            have_error = True
-
-        if not valid_email(self.email):
-            params['error_email'] = "That's not a valid email."
-            have_error = True
-
-        if have_error:
-            self.render('welcome.html', **params)
-        else:
-            self.done()
-
-    def done(self, *a, **kw):
-        raise NotImplementedError
-
-class Unit2Signup(Signup):
-    def done(self):
-    	self.redirect('/unit2/welcome?username=' + self.username)
-
-class Register(Signup):
-    def done(self):
-        #make sure the user doesn't already exist
-        u = User.by_name(self.username)
-        if u:
-            msg = 'That user already exists.'
-            self.render('signup-form.html', error_username = msg)
-        else:
-            u = User.register(self.username, self.password, self.email)
-            u.put()
-
-            self.login(u)
-            self.redirect('/unit3/welcome')
-
-class Login(BlogHandler):
-    def get(self):
-        self.render('login-form.html')
-
-    def post(self):
-        username = self.request.get('username')
-        password = self.request.get('password')
-
-        u = User.login(username, password)
-        if u:
-            self.login(u)
-            self.redirect('/blog')
-        else:
-            msg = 'Invalid login'
-            self.render('login-form.html', error = msg)
-
-class Logout(BlogHandler):
-    def get(self):
-        self.logout()
-        self.redirect('/blog')
-
-class Unit3Welcome(BlogHandler):
-    def get(self):
-        if self.user:
-            self.render('welcome.html', username = self.user.name)
-        else:
-            self.redirect('/signup')
 
 class Welcome(BlogHandler):
     def get(self):
@@ -359,8 +345,6 @@ class Welcome(BlogHandler):
 
 app = webapp2.WSGIApplication([('/', MainPage),
                                ('/unit2/rot13', Rot13),
-                               ('/unit2/signup', Unit2Signup),
-                               ('/unit2/welcome', Welcome),
                                ('/blog/?', BlogFront),
                                ('/blog/([0-9]+)', PostPage),
                                ('/blog/newpost', NewPost),
@@ -368,9 +352,8 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/calendar/?', CalendarFront),
                                ('/calendar/eventlist', CalendarEventList),
                                ('/calendar/([0-9]+)', CalendarEventPage),
-                               ('/signup', Register),
+                               ('/signup', Signup),
                                ('/login', Login),
-                               ('/logout', Logout),
-                               ('/unit3/welcome', Unit3Welcome),
+                               ('/logout', Logout)
                                ],
                               debug=True)
